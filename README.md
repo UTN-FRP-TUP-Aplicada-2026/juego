@@ -33,8 +33,8 @@ El proyecto está pensado para:
 * Los bloques caen desde la parte superior (rojo por defecto)
 * La caída de bloques aumenta en velocidad y en cantidad con el score a medida que pasa el tiempo
 * **Bloques congelados**: al tocar el hilo, el bloque se congela (suspende) en su posición actual y cambia de color a azul
-* Los bloques que caen y colisionan con bloques congelados se destruyen automáticamente
-* Los bloques congelados no desaparecen hasta que el juego termina
+* **Colisión entre bloques**: cuando un bloque que cae choca contra un bloque congelado, **ambos se eliminan** del juego
+* Esta mecánica permite crear cadenas de reacciones: derribar un bloque congelado permite que otros caigan en cascada
 
 ### Game Over
 
@@ -122,9 +122,15 @@ Actualmente hay tres detecciones:
 
 Congela el bloque (lo suspende) y suma puntos. El bloque cambia de color rojo a azul.
 
-### 🔌 Bloque que cae vs bloque congelado
+### ⚡ Bloque que cae vs bloque congelado
 
-Destruye el bloque que cae. Permite crear estructuras de bloques suspendidos.
+**Ambos bloques se eliminan**. Permite crear cadenas de reacciones destructivas.
+
+Comportamiento:
+- El bloque que cae detecta colisión con el bloque congelado
+- Se elimina el bloque que cayó
+- Se elimina el bloque congelado que fue impactado
+- Esta mecánica permite derribar estructuras (skill-based gameplay)
 
 ### 💀 Obstáculo vs araña
 
@@ -140,8 +146,8 @@ Cuando un bloque es alcanzado por el hilo:
 2. Se detiene su movimiento (clearInterval del loop de caída)
 3. Cambia de apariencia: color azul y bordes
 4. Permanece estático en esa posición
-5. Actúa como plataforma: bloques que caen sobre él se destruyen
-6. Se elimina cuando Game Over
+5. Actúa como obstáculo: bloques que caen sobre él se destruyen **junto con el bloque congelado**
+6. Se elimina cuando Game Over O cuando es impactado por un bloque que cae
 
 Implementación:
 ```js
@@ -149,6 +155,15 @@ $obstacle.addClass('frozen');  // marcar como congelado
 // El hilo se destruye inmediatamente
 activeWeb.remove();
 activeWeb = null;
+```
+
+Cuando colisiona con un bloque que cae:
+```js
+if (collidedFrozen) {
+    $obstacle.remove();        // eliminar bloque que cae
+    collidedFrozen.remove();   // eliminar bloque congelado
+    return;
+}
 ```
 
 Estilos asociados:
@@ -159,6 +174,13 @@ Estilos asociados:
     border: 2px solid #0080cc;
 }
 ```
+
+### Estrategia de juego
+
+Los bloques congelados permiten:
+- **Crear torres**: acumular bloques congelados para construir defensas
+- **Destruir torres**: si un bloque cae sobre la estructura, ambos se eliminan (puedes derribar torres estratégicamente)
+- **Skill-based gameplay**: requiere precisión para crear y destruir estructuras
 
 ---
 
@@ -254,7 +276,7 @@ startChaseAnimation()
 
 * [x] limitar movimiento dentro del gameArea
 * [x] bloques congelados (suspendidos) al tocar el hilo
-* [x] destrucción de bloques al chocar con bloques congelados
+* [x] **eliminación mutua**: bloques que caen destruyen bloques congelados (y viceversa)
 * [x] controles móviles (click/touchstart)
 * [x] corregir tecla izquierda en teclado (usando e.code en lugar de e.key)
 
@@ -264,6 +286,7 @@ startChaseAnimation()
 * [ ] prevenir multi-touch issues
 * [ ] suavizar movimiento (lerp o easing)
 * [ ] sonidos (colisión, congelado, game over)
+* [ ] indicador visual de cadena de reacciones (combo counter)
 
 ### Media
 
@@ -309,8 +332,8 @@ createObstacle() [cada 1000ms]
            ├─ mover hacia abajo (speed px)
            ├─ verificar salida de pantalla
            ├─ detectar 3 colisiones:
-           │  1. hilo → congelar bloque
-           │  2. bloque congelado → destruir bloque actual
+           │  1. hilo → congelar bloque + suma puntos
+           │  2. bloque congelado → ELIMINAR AMBOS
            │  3. araña → game over
            └─ limpiar si es necesario
 ```

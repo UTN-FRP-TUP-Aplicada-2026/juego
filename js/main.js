@@ -86,7 +86,7 @@
                 // 🔌 colisión con bloques congelados
                 if (!$obstacle.hasClass('frozen')) {
                     const frozenBlocks = $('.obstacle.frozen');
-                    let collisionWithFrozen = false;
+                    let collidedFrozen = null;
 
                     frozenBlocks.each(function () {
                         const frozenRect = this.getBoundingClientRect();
@@ -97,13 +97,15 @@
                             obstacleRect.top < frozenRect.bottom &&
                             obstacleRect.bottom > frozenRect.top
                         ) {
-                            collisionWithFrozen = true;
+                            collidedFrozen = $(this);
                             return false;
                         }
                     });
 
-                    if (collisionWithFrozen) {
+                    if (collidedFrozen) {
+                        // Eliminar ambos bloques: el que cae y el que está congelado
                         $obstacle.remove();
+                        collidedFrozen.remove();
                         clearInterval(interval);
                         return;
                     }
