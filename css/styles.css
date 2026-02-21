@@ -1,0 +1,73 @@
+
+
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
+
+#gameArea {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background-color: #f0f8ff;
+    overflow: hidden;
+}
+#mouse {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background: url('ratona.jpg') no-repeat center center;
+    background-size: cover;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.obstacle {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background-color: red;
+}
+#score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 20px;
+    color: #333;
+}
+#gameOver {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: none;
+}
+#gameOver h1 {
+    font-size: 36px;
+    color: #333;
+}
+#gameOver button {
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.web {
+    position: absolute;
+    width: 4px;
+    background: #555;
+}
+
+#mouse {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background: url('../img/araña.png') no-repeat center center;
+    background-size: cover;
+    left: 50%;
+    top: 70%;
+    transform: translate(-50%, -50%);
+    pointer-events: none; /* MUY recomendable */
+}
