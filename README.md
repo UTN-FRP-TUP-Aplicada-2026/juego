@@ -17,8 +17,10 @@ El proyecto está pensado para:
 
 ### Movimiento
 
-* ⬅️➡️ Flechas izquierda/derecha → mueven la araña
-* 📱 Botones para control táctil desde navegador móvil (celular)
+* ⬅️ **Flecha izquierda** → mueve la araña 25px hacia la izquierda
+* ➡️ **Flecha derecha** → mueve la araña 25px hacia la derecha
+* Limitación: la araña no puede salirse de los bordes del gameArea
+* 📱 **Botones para control táctil** desde navegador móvil con eventos `click` y `touchstart`
 
 ### Disparo
 
@@ -28,9 +30,11 @@ El proyecto está pensado para:
 
 ### Obstáculos
 
-* Los bloques caen desde la parte superior
-* La caida de bloques aumentan en velocidad y en cantidad con el score a medida que aumenta el tiempo
-* Se conjelan al tocar el hilo, quedan suspendidos.
+* Los bloques caen desde la parte superior (rojo por defecto)
+* La caída de bloques aumenta en velocidad y en cantidad con el score a medida que pasa el tiempo
+* **Bloques congelados**: al tocar el hilo, el bloque se congela (suspende) en su posición actual y cambia de color a azul
+* Los bloques que caen y colisionan con bloques congelados se destruyen automáticamente
+* Los bloques congelados no desaparecen hasta que el juego termina
 
 ### Game Over
 
@@ -61,13 +65,19 @@ Al terminar:
 
 ## ⚙️ Variables clave del juego
 
-| Variable     | Propósito                     |
-| ------------ | ----------------------------- |
-| `score`      | puntaje actual                |
-| `speed`      | velocidad de caída            |
-| `difficulty` | cantidad de bloques por spawn |
-| `isGameOver` | estado del juego              |
-| `activeWeb`  | hilo activo                   |
+| Variable     | Propósito                     | Rango/Valores  |
+| ------------ | ----------------------------- | -------------- |
+| `score`      | puntaje actual                | 0 → ∞          |
+| `speed`      | velocidad de caída de bloques | 3 → ∞ (px/frame) |
+| `difficulty` | cantidad de bloques por spawn | 1 → ∞ (bloques/spawn) |
+| `isGameOver` | estado del juego              | true/false     |
+| `activeWeb`  | hilo activo (jQuery object)   | null/jQuery    |
+| `gameInterval` | ID del spawn loop            | setInterval ID |
+
+**Progresión:**
+- Cada 10 puntos: `difficulty++` y `speed += 1`
+- Bloques spawn cada 1000ms (1 segundo)
+- Cada bloque cae a velocidad `speed` (30ms por frame)
 
 ---
 
@@ -106,11 +116,15 @@ Se usa bounding box del DOM:
 element.getBoundingClientRect()
 ```
 
-Actualmente hay dos detecciones:
+Actualmente hay tres detecciones:
 
 ### 🕸️ Hilo vs obstáculo
 
-Destruye el bloque y suma puntos.
+Congela el bloque (lo suspende) y suma puntos. El bloque cambia de color rojo a azul.
+
+### 🔌 Bloque que cae vs bloque congelado
+
+Destruye el bloque que cae. Permite crear estructuras de bloques suspendidos.
 
 ### 💀 Obstáculo vs araña
 
@@ -118,9 +132,56 @@ Dispara `endGame()`.
 
 ---
 
-## 📱 Controles mobile
+## ❄️ Sistema de bloques congelados
 
-Botones requeridos en el HTML:
+Cuando un bloque es alcanzado por el hilo:
+
+1. El bloque recibe la clase CSS `.frozen`
+2. Se detiene su movimiento (clearInterval del loop de caída)
+3. Cambia de apariencia: color azul y bordes
+4. Permanece estático en esa posición
+5. Actúa como plataforma: bloques que caen sobre él se destruyen
+6. Se elimina cuando Game Over
+
+Implementación:
+```js
+$obstacle.addClass('frozen');  // marcar como congelado
+// El hilo se destruye inmediatamente
+activeWeb.remove();
+activeWeb = null;
+```
+
+Estilos asociados:
+```css
+.obstacle.frozen {
+    background-color: #00a8ff;
+    opacity: 0.8;
+    border: 2px solid #0080cc;
+}
+```
+
+---
+
+## ⌨️ Sistema de entrada (Input)
+
+### Controles de teclado
+
+```js
+$(document).on('keydown', function (e) {
+    // ArrowLeft: e.code === 'ArrowLeft'
+    // ArrowRight: e.code === 'ArrowRight'
+    // Space: e.code === 'Space'
+    // Usar e.preventDefault() para evitar scroll
+});
+```
+
+**Notas importantes:**
+- Usar `e.code` en lugar de `e.key` para arrow keys (más portable)
+- Agregar `e.preventDefault()` para evitar que el navegador capture las teclas
+- Verificar `isGameOver` antes de procesar comandos de juego
+- Un solo hilo activo (`activeWeb`) a la vez
+
+### Controles móviles
 
 ```html
 <button id="btnLeft">⬅️</button>
@@ -128,10 +189,46 @@ Botones requeridos en el HTML:
 <button id="btnRight">➡️</button>
 ```
 
-Eventos soportados:
+```js
+$('#btnLeft').on('click touchstart', function () {
+    moveSpider(-1);
+});
+```
 
-* `click`
-* `touchstart`
+**Notas:**
+- Usar `click` para desktop y `touchstart` para dispositivos táctiles
+- No usar `mousedown` (mejor usar eventos separados)
+- Prevenir multi-touch usando flags o tracking de toques activos
+
+---
+
+## 🎯 Performance y optimizaciones
+
+### Problemas potenciales
+
+1. **Memory leaks**: Cada bloque crea un `setInterval` que debe limpiarse
+   - Solución: `clearInterval()` en cada rama de salida (colisión, salida de pantalla, game over)
+
+2. **Muchos setIntervals activos**: Con `difficulty` alto, muchos loops en paralelo
+   - Alternativa: usar `requestAnimationFrame` con un loop único
+   - Alternativa: usar `setTimeout` en lugar de `setInterval`
+
+3. **Búsqueda lineal de colisiones**: Cada bloque busca contra todos los bloques congelados
+   - Solución: usar spatial partitioning o quadtrees para juegos más grandes
+
+### Optimizaciones actuales
+
+- `clearInterval` en las siguientes situaciones:
+  - Game Over
+  - Bloque sale de pantalla
+  - Colisión con hilo (bloque congelado)
+  - Colisión con bloque congelado (bloque destruido)
+
+### Próximas optimizaciones
+
+- Reemplazar `setInterval` por `requestAnimationFrame`
+- Usar object pooling para reutilizar el DOM de bloques
+- Usar CSS animations/transitions en lugar de JS para animaciones suaves
 
 ---
 
@@ -153,25 +250,88 @@ startChaseAnimation()
 
 ## 🚧 Pendientes (TODO para Copilot)
 
+### ✅ Completado
+
+* [x] limitar movimiento dentro del gameArea
+* [x] bloques congelados (suspendidos) al tocar el hilo
+* [x] destrucción de bloques al chocar con bloques congelados
+* [x] controles móviles (click/touchstart)
+* [x] corregir tecla izquierda en teclado (usando e.code en lugar de e.key)
+
 ### Alta prioridad
 
-* [ ] limitar movimiento dentro del gameArea
 * [ ] mejorar hitbox de la araña
 * [ ] prevenir multi-touch issues
-* [ ] suavizar movimiento (lerp)
+* [ ] suavizar movimiento (lerp o easing)
+* [ ] sonidos (colisión, congelado, game over)
 
 ### Media
 
-* [ ] animación del hilo
-* [ ] sprites de la araña
-* [ ] pausa del juego
+* [ ] animación del hilo (transición suave de altura)
+* [ ] sprites animados de la araña
+* [ ] pausa del juego (tecla P o botón)
+* [ ] indicador de dificultad/nivel actual
 
 ### Pro
 
-* [ ] reemplazar setInterval por requestAnimationFrame
-* [ ] object pooling de obstáculos
-* [ ] sistema de niveles
-* [ ] soporte gamepad
+* [ ] reemplazar setInterval por requestAnimationFrame (mejor rendimiento)
+* [ ] object pooling de obstáculos (reutilizar en lugar de crear/destruir)
+* [ ] sistema de niveles con velocidades progresivas
+* [ ] soporte gamepad (controladores)
+* [ ] multiplayer local (2 jugadores)
+
+---
+
+## 📐 Arquitectura y patrones
+
+### Patrón de desarrollo
+
+El proyecto usa **jQuery** con un patrón de **event-driven + loops de juego**:
+
+```
+$(document).ready() 
+  ├─ inicializar variables globales
+  ├─ definir funciones de lógica del juego
+  ├─ vincular event listeners (keydown, buttons)
+  ├─ vincular event listeners (reset)
+  └─ startGame() → setInterval(createObstacle, 1000)
+```
+
+### Flujo de creación de bloques
+
+```
+createObstacle() [cada 1000ms]
+  └─ for (difficulty bloques)
+     └─ cada bloque:
+        ├─ crear <div class="obstacle"> 
+        ├─ posición random en X, top: 0
+        └─ setInterval [cada 30ms]
+           ├─ mover hacia abajo (speed px)
+           ├─ verificar salida de pantalla
+           ├─ detectar 3 colisiones:
+           │  1. hilo → congelar bloque
+           │  2. bloque congelado → destruir bloque actual
+           │  3. araña → game over
+           └─ limpiar si es necesario
+```
+
+### Manejo de estado
+
+- **`isGameOver`**: flag principal que detiene lógica del juego
+- **`activeWeb`**: referencia al único hilo activo (null si no hay)
+- Todas las funciones de lógica verifican `if (isGameOver) return;`
+- `resetGame()` limpia todo y reinicia
+
+### Uso de jQuery
+
+```js
+const $spider = $('#mouse');           // selector
+const spiderPos = $spider.position();   // posición
+$spider.css('left', newLeft);          // cambiar CSS
+$obstacle.addClass('frozen');          // agregar clase
+```
+
+**Nota**: jQuery es usado para manipulación del DOM y eventos. Para un proyecto más grande, considerar usar Vue.js, React, o Vanilla JS con Web Components.
 
 ---
 

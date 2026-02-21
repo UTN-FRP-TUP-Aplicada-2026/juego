@@ -12,6 +12,15 @@
     let isGameOver = false;
     let activeWeb = null; // hilo activo
 
+    // Centrar la araña al inicio
+    function centerSpider() {
+        const centerX = $gameArea.width() / 2 - 25; // 25 es la mitad del ancho de la araña (50px)
+        $spider.css('left', centerX);
+    }
+
+    // Inicializar posición de la araña
+    centerSpider();
+
     // ===============================
     // CREAR BLOQUES
     // ===============================
@@ -58,7 +67,8 @@
                         webRect.top < obstacleRect.bottom &&
                         webRect.bottom > obstacleRect.top
                     ) {
-                        $obstacle.remove();
+                        // Congelar el bloque en lugar de eliminarlo
+                        $obstacle.addClass('frozen');
                         score++;
                         $score.text(`Score: ${score}`);
 
@@ -66,6 +76,34 @@
                             difficulty++;
                             speed += 1;
                         }
+                        activeWeb.remove();
+                        activeWeb = null;
+                        clearInterval(interval);
+                        return;
+                    }
+                }
+
+                // 🔌 colisión con bloques congelados
+                if (!$obstacle.hasClass('frozen')) {
+                    const frozenBlocks = $('.obstacle.frozen');
+                    let collisionWithFrozen = false;
+
+                    frozenBlocks.each(function () {
+                        const frozenRect = this.getBoundingClientRect();
+
+                        if (
+                            obstacleRect.left < frozenRect.right &&
+                            obstacleRect.right > frozenRect.left &&
+                            obstacleRect.top < frozenRect.bottom &&
+                            obstacleRect.bottom > frozenRect.top
+                        ) {
+                            collisionWithFrozen = true;
+                            return false;
+                        }
+                    });
+
+                    if (collisionWithFrozen) {
+                        $obstacle.remove();
                         clearInterval(interval);
                         return;
                     }
@@ -91,27 +129,33 @@
         if (isGameOver) return;
         const step = 25;
         const currentLeft = $spider.position().left;
-        const maxLeft = $gameArea.width() - 50;
+        const spiderWidth = 50;
+        const maxLeft = $gameArea.width() - spiderWidth;
+        const minLeft = 0;
+        
         let newLeft = currentLeft + (direction * step);
         
         // Limitar límites
-        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
         $spider.css('left', newLeft);
     }
 
     $(document).on('keydown', function (e) {
-        if (isGameOver) return;
+        if (isGameOver && e.code !== 'ArrowLeft' && e.code !== 'ArrowRight' && e.code !== 'Space') return;
 
-        // ⬅️➡️ mover
-        if (e.key === 'ArrowLeft') {
+        // ⬅️➡️ mover con arrow keys
+        if (e.code === 'ArrowLeft') {
+            e.preventDefault();
             moveSpider(-1);
-        }
-        if (e.key === 'ArrowRight') {
+        } else if (e.code === 'ArrowRight') {
+            e.preventDefault();
             moveSpider(1);
         }
 
         // 🕸️ disparar
         if (e.code === 'Space') {
+            e.preventDefault();
+            if (isGameOver) return;
             if (activeWeb) return;
 
             const spiderPos = $spider.position();
@@ -172,6 +216,7 @@
         $gameArea.find('.obstacle').remove();
         $('.web').remove();
         activeWeb = null;
+        centerSpider();
         startGame();
     }
 
@@ -184,16 +229,57 @@
     // ===============================
     // CONTROLES MOBILE
     // ===============================
-    $('#btnLeft').on('click touchstart', function () {
+    $('#btnLeft').on('click touchstart', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         moveSpider(-1);
     });
 
-    $('#btnRight').on('click touchstart', function () {
+    $('#btnRight').on('click touchstart', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
         moveSpider(1);
     });
 
-    $('#btnShoot').on('click touchstart', function () {
-        $(document).trigger($.Event('keydown', { code: 'Space' }));
+    $('#btnShoot').on('click touchstart', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isGameOver && !activeWeb) {
+            // Disparar hilo
+            const spiderPos = $spider.position();
+            activeWeb = $('<div class="web"></div>');
+            activeWeb.css({
+                position: 'absolute',
+                width: '4px',
+                background: '#555',
+                left: spiderPos.left + 23,
+                top: spiderPos.top,
+                height: '0px'
+            });
+
+            $gameArea.append(activeWeb);
+
+            const webInterval = setInterval(() => {
+                if (!activeWeb) {
+                    clearInterval(webInterval);
+                    return;
+                }
+
+                const currentHeight = parseInt(activeWeb.css('height'));
+                const newTop = parseInt(activeWeb.css('top')) - 15;
+
+                if (newTop <= 0) {
+                    activeWeb.remove();
+                    activeWeb = null;
+                    clearInterval(webInterval);
+                } else {
+                    activeWeb.css({
+                        height: currentHeight + 15,
+                        top: newTop
+                    });
+                }
+            }, 30);
+        }
     });
 
     function startChaseAnimation() {
