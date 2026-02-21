@@ -34,17 +34,23 @@
 
                 const currentTop = parseInt($obstacle.css('top'));
 
+                // Verificar si salió de pantalla
                 if (currentTop > $gameArea.height()) {
                     $obstacle.remove();
                     clearInterval(interval);
-                } else {
-                    $obstacle.css('top', currentTop + speed);
+                    return;
                 }
 
-                // 🔥 detectar captura con hilo
+                // Mover hacia abajo
+                $obstacle.css('top', currentTop + speed);
+
+                // 🔥 detectar colisiones
+                const obstacleRect = $obstacle[0].getBoundingClientRect();
+                const spiderRect = $spider[0].getBoundingClientRect();
+
+                // 🕸️ colisión con hilo
                 if (activeWeb) {
                     const webRect = activeWeb[0].getBoundingClientRect();
-                    const obstacleRect = $obstacle[0].getBoundingClientRect();
 
                     if (
                         webRect.left < obstacleRect.right &&
@@ -60,80 +66,100 @@
                             difficulty++;
                             speed += 1;
                         }
+                        clearInterval(interval);
+                        return;
                     }
+                }
+
+                // 💀 colisión con araña (GAME OVER)
+                if (
+                    spiderRect.left < obstacleRect.right &&
+                    spiderRect.right > obstacleRect.left &&
+                    spiderRect.top < obstacleRect.bottom &&
+                    spiderRect.bottom > obstacleRect.top
+                ) {
+                    endGame();
                 }
             }, 30);
         }
     }
 
     // ===============================
-    // MOVER ARAÑA CON EL MOUSE
-    // ===============================
-    $gameArea.on('mousemove', function (e) {
-        if (isGameOver) return;
-
-        const offset = $gameArea.offset();
-        const x = e.pageX - offset.left - 25;
-        const y = e.pageY - offset.top - 25;
-
-        $spider.css({
-            left: x,
-            top: y,
-            bottom: 'auto',
-            transform: 'none'
-        });
-    });
-
-    // ===============================
     // DISPARAR HILO (ESPACIO)
     // ===============================
+    function moveSpider(direction) {
+        if (isGameOver) return;
+        const step = 25;
+        const currentLeft = $spider.position().left;
+        const maxLeft = $gameArea.width() - 50;
+        let newLeft = currentLeft + (direction * step);
+        
+        // Limitar límites
+        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        $spider.css('left', newLeft);
+    }
+
     $(document).on('keydown', function (e) {
         if (isGameOver) return;
-        if (e.code !== 'Space') return;
-        if (activeWeb) return; // solo un hilo a la vez
 
-        const spiderPos = $spider.position();
+        // ⬅️➡️ mover
+        if (e.key === 'ArrowLeft') {
+            moveSpider(-1);
+        }
+        if (e.key === 'ArrowRight') {
+            moveSpider(1);
+        }
 
-        activeWeb = $('<div class="web"></div>');
-        activeWeb.css({
-            position: 'absolute',
-            width: '4px',
-            background: '#555',
-            left: spiderPos.left + 23,
-            top: spiderPos.top,
-            height: '0px'
-        });
+        // 🕸️ disparar
+        if (e.code === 'Space') {
+            if (activeWeb) return;
 
-        $gameArea.append(activeWeb);
+            const spiderPos = $spider.position();
 
-        // animar hilo hacia arriba
-        const webInterval = setInterval(() => {
-            if (!activeWeb) {
-                clearInterval(webInterval);
-                return;
-            }
+            activeWeb = $('<div class="web"></div>');
+            activeWeb.css({
+                position: 'absolute',
+                width: '4px',
+                background: '#555',
+                left: spiderPos.left + 23,
+                top: spiderPos.top,
+                height: '0px'
+            });
 
-            const currentHeight = parseInt(activeWeb.css('height'));
-            const newTop = parseInt(activeWeb.css('top')) - 15;
+            $gameArea.append(activeWeb);
 
-            if (newTop <= 0) {
-                activeWeb.remove();
-                activeWeb = null;
-                clearInterval(webInterval);
-            } else {
-                activeWeb.css({
-                    height: currentHeight + 15,
-                    top: newTop
-                });
-            }
-        }, 30);
+            const webInterval = setInterval(() => {
+                if (!activeWeb) {
+                    clearInterval(webInterval);
+                    return;
+                }
+
+                const currentHeight = parseInt(activeWeb.css('height'));
+                const newTop = parseInt(activeWeb.css('top')) - 15;
+
+                if (newTop <= 0) {
+                    activeWeb.remove();
+                    activeWeb = null;
+                    clearInterval(webInterval);
+                } else {
+                    activeWeb.css({
+                        height: currentHeight + 15,
+                        top: newTop
+                    });
+                }
+            }, 30);
+        }
     });
 
     // ===============================
     function endGame() {
+        if (isGameOver) return;
+
         isGameOver = true;
         clearInterval(gameInterval);
         $gameOver.show();
+
+        startChaseAnimation(); // 👈 LA MAGIA
     }
 
     function resetGame() {
@@ -154,6 +180,56 @@
     }
 
     $resetButton.on('click', resetGame);
+
+    // ===============================
+    // CONTROLES MOBILE
+    // ===============================
+    $('#btnLeft').on('click touchstart', function () {
+        moveSpider(-1);
+    });
+
+    $('#btnRight').on('click touchstart', function () {
+        moveSpider(1);
+    });
+
+    $('#btnShoot').on('click touchstart', function () {
+        $(document).trigger($.Event('keydown', { code: 'Space' }));
+    });
+
+    function startChaseAnimation() {
+        const $bot = $('<div id="aranabot"></div>');
+        $gameArea.append($bot);
+
+        let botX = $gameArea.width() - 60;
+        let dir = -1;
+
+        $bot.css({
+            left: botX,
+            top: $spider.position().top
+        });
+
+        const chaseInterval = setInterval(() => {
+            if (!isGameOver) {
+                clearInterval(chaseInterval);
+                $bot.remove();
+                return;
+            }
+
+            // mover bot
+            botX += dir * 4;
+            if (botX < 0 || botX > $gameArea.width() - 50) {
+                dir *= -1;
+            }
+            $bot.css('left', botX);
+
+            // la araña lo persigue
+            const spiderX = $spider.position().left;
+            const diff = botX - spiderX;
+
+            $spider.css('left', spiderX + diff * 0.05);
+
+        }, 30);
+    }
 
     startGame();
 });

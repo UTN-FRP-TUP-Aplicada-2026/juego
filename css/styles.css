@@ -13,16 +13,6 @@ body {
     background-color: #f0f8ff;
     overflow: hidden;
 }
-#mouse {
-    position: absolute;
-    width: 50px;
-    height: 50px;
-    background: url('ratona.jpg') no-repeat center center;
-    background-size: cover;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-}
 .obstacle {
     position: absolute;
     width: 50px;
@@ -67,7 +57,47 @@ body {
     background: url('../img/araña.png') no-repeat center center;
     background-size: cover;
     left: 50%;
-    top: 70%;
-    transform: translate(-50%, -50%);
-    pointer-events: none; /* MUY recomendable */
+    bottom: 20px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+/* =========================
+   CONTROLES MOBILE
+========================= */
+#mobileControls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    gap: 20px;
+    z-index: 1000;
+}
+
+#mobileControls button {
+    width: 70px;
+    height: 70px;
+    font-size: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.6);
+    color: white;
+}
+
+/* mostrar en pantallas chicas */
+@media (max-width: 768px) {
+    #mobileControls {
+        display: flex;
+    }
+}
+
+/* araña bot */
+#aranabot {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background: url('../img/bot.png') no-repeat center center;
+    background-size: cover;
+    z-index: 100;
 }
